@@ -1,24 +1,31 @@
-
 # quickserve
 
-This directory contains the start on a development tool for 1010data quickapps.
+A dev server for [1010data](https://www.1010data.com) QuickApps. Watches local XML files and live-reloads the app in the browser on every save.
 
-## quick start
+Requires [Node.js](https://nodejs.org) 18+.
 
-- install [node.js](https://nodejs.org/en)
-- install the dependencies (`ws`, `chokidar`, etc) with:
+## setup
 
-      cd /path/to/quickserve
-      npm install
+In your QuickApp project directory:
 
-- run the dev server with this command:
+```sh
+npx quickserve init      # enter gateway URL, username, password → writes quickserve.json
+npx quickserve app.xml   # start the dev server
+```
 
-      cd /path/to/quickserve
-      node quickserve.js quickapp.xml
+Then open http://localhost:8080/. Edit `app.xml` and the browser reloads automatically.
 
-- visit http://localhost:8080/
-- fill out the form to log into a 1010 environment.
-- quickserve uploads `quickapp.xml` via API2.
-- an iframe appears, with the quickapp displayed.
-- edit and save the message in `quickapp.xml`
-- the xml is re-uploaded and the iframe is refreshed.
+## how it works
+
+- `quickserve init` saves credentials to `quickserve.json` (gitignored automatically).
+- On startup, quickserve logs in and uploads the XML via API2. An iframe displays the running app.
+- Any `.xml` change triggers a re-upload and iframe refresh.
+- Pass a different XML file as an argument, or omit it to default to `quickapp.xml`.
+
+## developing quickserve itself
+
+```sh
+npm install
+npm run quickserve       # tsc + tsx quickserve.mts
+npm run build            # compile to dist/ for publishing
+```
