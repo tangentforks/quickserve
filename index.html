@@ -3,11 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>QuickServe</title>
-  <script src="https://www2.corp.1010data.com/beta-latest/js/require.js"></script>
-  <script>
-    require.config({
-      paths: { Vue: 'https://cdn.jsdelivr.net/npm/vue@2/dist/vue' }});
-  </script>
   <style>
     body, th, td { font-family: Calibri, Arial, sans-serif; }
     html, body, #app, main, iframe, nav {
@@ -33,36 +28,41 @@
     </main>
   </div>
 </body>
-<script>
-require(['Vue', '1010api2-fetch'], function(Vue, api2) {
-  // --- app logic starts here ------------------------------------
+<script type="module">
+import Vue from 'https://cdn.jsdelivr.net/npm/vue@2/dist/vue.esm.browser.js';
+import { API2Client } from './API2Client.mjs';
 
-  const ac = new api2.API2Client();
+const ac = new API2Client();
 
-  const vm = new Vue({
-    el: '#app',
-    data: ()=>({tag: 0, appPath: '', tenBox:'', tenVer:''}),
-    methods: {
-      reload(path) {
-        this.appPath = path;
-        fetch(this.appPath).then(r=>r.text()).then(xml=>{
-          ac.call('new', {xml}).then(r=> this.tag = r.tag)})}},
-    computed: {
-      remoteURL() { return `http://${this.tenBox}/cgi-bin/${this.tenVer}/quickapp.k?tag_=${this.tag}` },
-      iframeSrc() { return '/cgi-bin/remote/quickapp.k?tag_=' + this.tag }}});
-
-  const ws = new WebSocket(`ws://${document.location.hostname}:${document.location.port}/ws`);
-  ws.onmessage = (e)=>{
-    const msg = JSON.parse(e.data);
-    console.log(msg)
-    switch(msg[0]) {
-      case 'setup': [vm.tenBox, vm.tenVer, vm.appPath]= msg[1]; vm.reload(vm.appPath); break;
-      case 'reload': vm.reload(msg[1]); break;
-      case 'refresh': window.location.reload(); break;
-      default: break}};
-
-  // expose all this stuff for debug purposes
-  window.vm = vm; window.ac=ac;
+const vm = new Vue({
+  el: '#app',
+  data: () => ({ tag: 0, appPath: '', tenBox: '', tenVer: '' }),
+  methods: {
+    reload(path) {
+      this.appPath = path;
+      fetch(this.appPath).then(r => r.text()).then(xml => {
+        ac.call('new', { xml }).then(r => { this.tag = r.tag; });
+      });
+    },
+  },
+  computed: {
+    remoteURL() { return `http://${this.tenBox}/cgi-bin/${this.tenVer}/quickapp.k?tag_=${this.tag}`; },
+    iframeSrc() { return '/cgi-bin/remote/quickapp.k?tag_=' + this.tag; },
+  },
 });
+
+const ws = new WebSocket(`ws://${document.location.hostname}:${document.location.port}/ws`);
+ws.onmessage = e => {
+  const msg = JSON.parse(e.data);
+  console.log(msg);
+  switch (msg[0]) {
+    case 'setup':   [vm.tenBox, vm.tenVer, vm.appPath] = msg[1]; vm.reload(vm.appPath); break;
+    case 'reload':  vm.reload(msg[1]); break;
+    case 'refresh': window.location.reload(); break;
+  }
+};
+
+// expose for debug
+window.vm = vm; window.ac = ac;
 </script>
 </html>

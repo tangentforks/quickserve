@@ -3,10 +3,17 @@
   "version": "0.1.0",
   "description": "Development server for 1010data QuickApps",
   "scripts": {
-    "quickserve": "node quickserve.js"
+    "quickserve": "tsx quickserve.mts",
+    "build": "tsc"
   },
   "dependencies": {
     "chokidar": "^3.5.3",
     "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/ws": "^8",
+    "tsx": "^4",
+    "typescript": "^5"
   }
 }
