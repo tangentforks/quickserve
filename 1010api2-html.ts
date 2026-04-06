@@ -25,11 +25,11 @@ export class API2Client {
   // main API2 entry point:
   call(ep, args, type='application/json'):Promise<any> {
     if (!args) args = {};
-    var self = this, data = args ? JSON.stringify(args) : '';
-    return new Promise(function (resolve, reject) {
+    const data = args ? JSON.stringify(args) : '';
+    return new Promise((resolve, reject) => {
       let xhr = new XMLHttpRequest();
-      xhr.open(args.method_ || "POST", self._url(ep, args.fmt_), true);
-      xhr.onreadystatechange = function () {
+      xhr.open(args.method_ || "POST", this._url(ep, args.fmt_), true);
+      xhr.onreadystatechange = () => {
         if (xhr.readyState !== xhr.DONE) return;
         if (xhr.status !== 200) reject(xhr);
         // TODO: only parse if fmt_.startsWith(json)
