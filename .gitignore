@@ -2,4 +2,4 @@ dev-mounts.json
 .last-login.json
 package-lock.json
 node_modules
-quickserve.mjs
+dist/
