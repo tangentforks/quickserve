@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>QuickServe</title>
-  <script src="http://www2.corp.1010data.com/beta-latest/js/require.js"></script>
+  <script src="https://www2.corp.1010data.com/beta-latest/js/require.js"></script>
   <script>
     require.config({
-      paths: { Vue: 'https://cdn.jsdelivr.net/npm/vue/dist/vue' }});
+      paths: { Vue: 'https://cdn.jsdelivr.net/npm/vue@2/dist/vue' }});
   </script>
   <style>
     body, th, td { font-family: Calibri, Arial, sans-serif; }
@@ -41,7 +41,7 @@ require(['Vue', '1010api2-html'], function(Vue, api2) {
 
   const vm = new Vue({
     el: '#app',
-    data: ()=>({tag: 0, appPath: '', tenBox:'mwallace.dev.edge.1010data.com', tenVer:'beta-19.58'}),
+    data: ()=>({tag: 0, appPath: '', tenBox:'', tenVer:''}),
     methods: {
       reload(path) {
         this.appPath = path;
@@ -56,7 +56,7 @@ require(['Vue', '1010api2-html'], function(Vue, api2) {
     const msg = JSON.parse(e.data);
     console.log(msg)
     switch(msg[0]) {
-      case 'setup': [this.tenBox, this.tenVer, this.appPath]= msg[1]; vm.reload(this.appPath); break;
+      case 'setup': [vm.tenBox, vm.tenVer, vm.appPath]= msg[1]; vm.reload(vm.appPath); break;
       case 'reload': vm.reload(msg[1]); break;
       case 'refresh': window.location.reload(); break;
       default: break}};
