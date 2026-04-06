@@ -22,10 +22,21 @@ Then open http://localhost:8080/. Edit `app.xml` and the browser reloads automat
 - Any `.xml` change triggers a re-upload and iframe refresh.
 - Pass a different XML file as an argument, or omit it to default to `quickapp.xml`.
 
+## installing system-wide
+
+```sh
+cd /path/to/quickserve
+npm install
+npm run build
+npm link
+```
+
+After that, `quickserve` is available in any directory. To unlink: `npm unlink -g quickserve`.
+
 ## developing quickserve itself
 
 ```sh
 npm install
 npm run quickserve       # tsc + tsx quickserve.mts
-npm run build            # compile to dist/ for publishing
+npm run build            # recompile dist/
 ```
