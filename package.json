@@ -2,6 +2,18 @@
   "name": "quickserve",
   "version": "0.1.0",
   "description": "Development server for 1010data QuickApps",
+  "type": "module",
+  "bin": {
+    "quickserve": "dist/quickserve.mjs"
+  },
+  "files": [
+    "dist/",
+    "index.html",
+    "login.html"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "quickserve": "tsc && tsx quickserve.mts",
     "build": "tsc"

@@ -1,12 +1,20 @@
+#!/usr/bin/env node
 /// file-watching dev server for quickapps
 
 import fs from 'node:fs';
 import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import chokidar from 'chokidar';
 import { API2Client, API2Error } from './API2Client.mjs';
 
 const HOST = 'localhost', PORT = 8080;
+
+/// Absolute path to the dist/ directory (where this file lives when compiled).
+/// Works whether run via `node dist/quickserve.mjs` or `tsx quickserve.mts`.
+const distDir     = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.resolve(distDir, '..');
 
 const SESS: { client: API2Client | null } = { client: null };
 
@@ -37,12 +45,13 @@ if (fs.existsSync(MOUNT_CONFIG)) {
   }
 }
 
-function validPath(path: string): boolean {
-  if (path.startsWith(process.cwd())) return true;
+function validPath(p: string): boolean {
+  if (p.startsWith(process.cwd())) return true;
+  if (p.startsWith(packageRoot))   return true;  // package assets (HTML, JS)
   for (const vp of validPaths) {
-    if (path.startsWith(vp)) return true;
+    if (p.startsWith(vp)) return true;
   }
-  console.log('!! invalid path requested: ' + path);
+  console.log('!! invalid path requested: ' + p);
   console.log('valid paths:', validPaths);
   return false;
 }
@@ -142,9 +151,10 @@ function dispatch(req: http.IncomingMessage, res: http.ServerResponse, data?: st
   const url = req.url ?? '/';
   console.log(req.method + ' ' + url + ' ' + JSON.stringify(data ?? ''));
   if      (url === '/login')                    login(res, Object.fromEntries(new URLSearchParams(data)));
-  else if (!SESS.client && !url.endsWith('.json')) staticFile(res, 'login.html');
+  else if (!SESS.client && !url.endsWith('.json')) staticFile(res, path.join(packageRoot, 'login.html'));
   else if (url === '/!logout')                  logout(res);
-  else if (url === '/')                         staticFile(res, 'index.html');
+  else if (url === '/')                         staticFile(res, path.join(packageRoot, 'index.html'));
+  else if (url.startsWith('/_qs/'))             staticFile(res, path.join(distDir, url.slice(5)));
   else if (url.startsWith('/api/'))             relay_api(req, res, SESS.client!, data);
   else if (url.startsWith('/remote/'))          relay_gui(req, res, SESS.client!, data);
   else if (url.startsWith('/cgi-bin/remote/'))  relay_cgi(req, res, SESS.client!, data);
