@@ -5,11 +5,45 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline/promises';
 import { WebSocketServer } from 'ws';
 import chokidar from 'chokidar';
 import { API2Client, API2Error } from './API2Client.mjs';
 
 const HOST = 'localhost', PORT = 8080;
+const CONFIG_FILE = 'quickserve.json';
+
+interface QuickServeConfig {
+  host: string;
+  ver:  string;
+  uid:  string;
+  pwd:  string;
+}
+
+async function initConfig(): Promise<void> {
+  const rl  = createInterface({ input: process.stdin, output: process.stdout });
+  const raw = (await rl.question('gateway URL (e.g. www2.corp.1010data.com/prime-latest/): ')).trim();
+  const uid = (await rl.question('username: ')).trim();
+  const pwd = (await rl.question('password: ')).trim();
+  rl.close();
+
+  // parse host + ver from the URL — accept with or without https://
+  const u    = new URL(raw.startsWith('http') ? raw : 'https://' + raw);
+  const host = u.hostname;
+  const ver  = u.pathname.split('/').filter(Boolean)[0] ?? 'prime-latest';
+
+  const config: QuickServeConfig = { host, ver, uid, pwd };
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + '\n');
+  console.log(`Wrote ${CONFIG_FILE}`);
+
+  // ensure quickserve.json is gitignored in the user's project
+  const gitignorePath = path.join(process.cwd(), '.gitignore');
+  const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
+  if (!existing.includes(CONFIG_FILE)) {
+    fs.appendFileSync(gitignorePath, (existing.endsWith('\n') ? '' : '\n') + CONFIG_FILE + '\n');
+    console.log(`Added ${CONFIG_FILE} to .gitignore`);
+  }
+}
 
 /// Absolute path to the dist/ directory (where this file lives when compiled).
 /// Works whether run via `node dist/quickserve.mjs` or `tsx quickserve.mts`.
@@ -182,7 +216,24 @@ const srv = http.createServer((req, res) => {
   }
 });
 
+if (process.argv[2] === 'init') {
+  await initConfig();
+  process.exit(0);
+}
+
 const appPath = process.argv[2] ?? 'quickapp.xml';
+
+// Auto-login if quickserve.json exists in CWD
+if (fs.existsSync(CONFIG_FILE)) {
+  try {
+    const cfg: QuickServeConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    SESS.client = await new API2Client().login(cfg);
+    console.log(`Auto-logged in as ${SESS.client.uid} on ${SESS.client.box}`);
+  } catch (e) {
+    console.error('Auto-login failed:', e);
+    console.error('Run `quickserve init` to reconfigure, or log in via the browser.');
+  }
+}
 
 /// websocket server
 const wss = new WebSocketServer({ server: srv, path: '/ws' });
