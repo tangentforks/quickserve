@@ -4,7 +4,6 @@
 const
   fs = require('fs'), // file system
   http = require('http'),
-  qs = require('querystring'),
   ws = require('ws'), // websocket
   chokidar = require('chokidar'), // file watcher
   // ---
@@ -30,16 +29,17 @@ function redirect(res, path) {
 let MOUNT_CONFIG = 'dev-mounts.json';
 let mountedPaths = [];
 let validPaths = [];
-fs.exists(MOUNT_CONFIG, y=>{
-  if (y) {
-    try {
-      let m = JSON.parse(fs.readFileSync(MOUNT_CONFIG).toString());
-      m.forEach(kv => {
-        mountedPaths.push([new RegExp(kv[0]), kv[1]]);
-        validPaths.push(kv[1]);});}
-    catch(e) {
-      console.log(`error parsing ${MOUNT_CONFIG}:` + e.toString());
-      console.log('expected a list of regexp/replace pairs.')}}});
+if (fs.existsSync(MOUNT_CONFIG)) {
+  try {
+    let m = JSON.parse(fs.readFileSync(MOUNT_CONFIG).toString());
+    m.forEach(kv => {
+      mountedPaths.push([new RegExp(kv[0]), kv[1]]);
+      validPaths.push(kv[1]);});
+  } catch(e) {
+    console.log(`error parsing ${MOUNT_CONFIG}:` + e.toString());
+    console.log('expected a list of regexp/replace pairs.');
+  }
+}
 
 function validPath(path) {
   if (path.startsWith(process.cwd())) return true;
@@ -110,9 +110,10 @@ function relay_nonapi(url, req, res, c, data) {
   fetch(url, args)
     .then(rr0 => { rr = rr0; return rr.text()})
     .then(text => {
-      res.writeHead(rr.status, rr.headers);
+      res.writeHead(rr.status, Object.fromEntries(rr.headers));
       res.write(text.replaceAll(c.ver,'remote'));
-      res.end()})}
+      res.end()})
+    .catch(e => httpErr(res, 502, 'Bad Gateway: ' + e.message))}
 
 function relay_gui(req, res, c, data) {
   let url = `https://${c.box}/${c.ver}/`+req.url.split('/').slice(2).join('/');
@@ -124,7 +125,7 @@ function relay_cgi(req, res, c, data) {
 
 function dispatch(req, res, data) {
   console.log(req.method + ' ' + req.url + ' ' + JSON.stringify(data||''));
-  if (req.url === '/login') login(res, qs.parse(data));   // login uses a normal form post
+  if (req.url === '/login') login(res, Object.fromEntries(new URLSearchParams(data)));   // login uses a normal form post
   else if (!SESS.client && !req.url.endsWith('.json')) staticFile(res, 'login.html');
   else if (req.url === '/!logout') logout(res);
   else if (req.url === '/') staticFile(res, 'index.html');
@@ -133,7 +134,7 @@ function dispatch(req, res, data) {
   else if (req.url.startsWith('/cgi-bin/remote/')) relay_cgi(req, res, SESS.client, data);
   else { // mounted path or local directory
     let url = req.url;
-    mountedPaths.forEach(kv => { url = url.replace(kv[0], kv[1]); });
+    for (const kv of mountedPaths) { if (kv[0].test(url)) { url = url.replace(kv[0], kv[1]); break; } }
     if (url === req.url) url = './' + url; // if unchanged, use local dir.
     staticFile(res, url)}}
 
@@ -141,13 +142,12 @@ function dispatch(req, res, data) {
 const srv = http.createServer((req, res)=> {
   if (req.method === 'POST') {
     let data = '';
-    // most of our work is just relaying post data to the API
     req.on('data', function (chunk) {
       data += chunk;
       if (data.length > 1e6) {
         httpErr(res, 413, 'Request too large');
-        req.socket.destroy()}
-      req.on('end', function() { dispatch(req, res, data)})})}
+        req.socket.destroy()}});
+    req.on('end', function() { dispatch(req, res, data)})}
   else { dispatch(req, res) }});
 
 let appPath = process.argv[2] || 'quickapp.xml';
@@ -155,6 +155,7 @@ let appPath = process.argv[2] || 'quickapp.xml';
 /// websocket server
 const wss = new ws.Server({server: srv, path: '/ws'});
 wss.on('connection', (ws)=> {
+  if (!SESS.client) { ws.close(); return; }
   ws.send(JSON.stringify(['setup', [SESS.client.box, SESS.client.ver, appPath]]));
   ws.on('message', (msg)=> {
     console.log('received: ' + msg); })});
@@ -164,7 +165,7 @@ function broadcast(msg) {
 
 /// file watcher
 const watcher = chokidar.watch('.',
-  {ignored: /(^|[\/\\])\../, persistent: true});
+  {ignored: /(^|[\/\\])(\.|node_modules)/, persistent: true});
 watcher.on('change', (path,info) => {
   console.log(`file changed: ${[path, JSON.stringify(info)]}`);
   if (path==='index.html') broadcast(["refresh"]);
