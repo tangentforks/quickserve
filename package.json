@@ -1,4 +1,7 @@
 {
+  "name": "quickserve",
+  "version": "0.1.0",
+  "description": "Development server for 1010data QuickApps",
   "scripts": {
     "quickserve": "node quickserve.js"
   },
