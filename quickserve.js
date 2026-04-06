@@ -7,7 +7,7 @@ const
   ws = require('ws'), // websocket
   chokidar = require('chokidar'), // file watcher
   // ---
-  n10 = require('./1010api2-node');
+  n10 = require('./1010api2-fetch');
 
 /// the host:port combo on which to run the local web server.
 const HOST = "localhost", PORT = 8080;
