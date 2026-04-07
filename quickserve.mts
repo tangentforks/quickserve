@@ -93,9 +93,7 @@ function validPath(p: string): boolean {
 /// serve a static file from the current directory.
 function staticFile(res: http.ServerResponse, path0: string): void {
   fs.realpath(path0, (err, path) => {
-    console.log('serving: ' + path);
-    if (err) console.log('err:', err);
-    if (err || !validPath(path)) { httpErr(res, 404, 'Not Found'); return; }
+    if (err || !validPath(path)) { console.error('404', path0, err?.code ?? ''); httpErr(res, 404, 'Not Found'); return; }
     fs.readFile(path, (readErr, data) => {
       if (readErr) { httpErr(res, 500, 'Internal Server Error: unable to read ' + path0); return; }
       // TODO: replace with a proper mime-type module
@@ -237,7 +235,6 @@ function relay_versioned(req: http.IncomingMessage, res: http.ServerResponse, c:
 
 function dispatch(req: http.IncomingMessage, res: http.ServerResponse, data?: string): void {
   const url = req.url ?? '/';
-  console.log(req.method + ' ' + url + ' ' + JSON.stringify(data ?? ''));
   if      (url === '/login')                    login(res, Object.fromEntries(new URLSearchParams(data)));
   else if (!SESS.client && !url.endsWith('.json')) staticFile(res, path.join(packageRoot, 'login.html'));
   else if (url === '/!logout')                  logout(res);
@@ -298,7 +295,7 @@ const wss = new WebSocketServer({ server: srv, path: '/ws' });
 wss.on('connection', socket => {
   if (!SESS.client) { socket.close(); return; }
   socket.send(JSON.stringify(['setup', [SESS.client.box, SESS.client.ver, appPath]]));
-  socket.on('message', msg => { console.log('received: ' + msg); });
+  socket.on('message', () => {});
 });
 
 function broadcast(msg: unknown[]): void {
@@ -307,11 +304,12 @@ function broadcast(msg: unknown[]): void {
 }
 
 /// file watcher
-chokidar.watch('.', { ignored: /(^|[/\\])(\.|node_modules)/, persistent: true })
-  .on('change', path => {
-    console.log('file changed: ' + path);
-    if (path === 'index.html')    broadcast(['refresh']);
-    else if (path.endsWith('.xml')) broadcast(['reload', path]);
+chokidar.watch('.', { ignored: ['**/node_modules/**', '**/.*'], persistent: true })
+  .on('ready', () => console.log('watching for file changes…'))
+  .on('change', p => {
+    console.log('changed: ' + p);
+    if (p === 'index.html')        broadcast(['refresh']);
+    else if (p.endsWith('.xml'))   broadcast(['reload', p]);
   });
 
 console.log(`listening at http://${HOST}:${PORT}/`);
