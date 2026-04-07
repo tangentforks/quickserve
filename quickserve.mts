@@ -172,8 +172,25 @@ function relay_nonapi(url: string, req: http.IncomingMessage, res: http.ServerRe
         )
       );
       res.writeHead(rr.status, fwdHeaders);
-      res.write(text.replaceAll(c.ver, 'remote'));
-      res.end();
+
+      // The server may redirect from an alias (e.g. beta-latest) to a pinned
+      // version (e.g. beta-22.26). Extract the actual version from rr.url so
+      // we can rewrite both forms out of the response body.
+      let actualVer = c.ver;
+      try {
+        const parts = new URL(rr.url).pathname.split('/').filter(Boolean);
+        // /cgi-bin/<ver>/...  →  parts[1];   /<ver>/...  →  parts[0]
+        const v = parts[0] === 'cgi-bin' ? parts[1] : parts[0];
+        if (v && v !== 'remote') actualVer = v;
+      } catch { /* ignore */ }
+
+      // Rewrite pinned version AND alias → 'remote' so all URLs stay on localhost.
+      // Rewrite location.hostname → location.host so JS that constructs URLs
+      // (e.g. TenTen.baseUrl) includes the port on non-standard ports like 8080.
+      res.end(text
+        .replaceAll(actualVer, 'remote')
+        .replaceAll(c.ver,     'remote')
+        .replaceAll('location.hostname', 'location.host'));
     })
     .catch((e: Error) => httpErr(res, 502, 'Bad Gateway: ' + e.message));
 }
@@ -188,6 +205,36 @@ function relay_cgi(req: http.IncomingMessage, res: http.ServerResponse, c: API2C
   relay_nonapi(url, req, res, c, data);
 }
 
+/// Proxy a version-prefixed path (e.g. /beta-22.26/gw?... or /beta-22.26/js/foo.js)
+/// directly to the server. Uses arrayBuffer so binary assets aren't corrupted,
+/// and forwards cookies so authenticated endpoints like /gw work.
+function relay_versioned(req: http.IncomingMessage, res: http.ServerResponse, c: API2Client, data?: string): void {
+  const url = `https://${c.box}${req.url ?? '/'}`;
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (k === 'host' || k === 'cookie') continue;
+    if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
+  }
+  if (c.isLoggedIn()) headers.set('Cookie', `${c.cookie()}; siduids=${c.sid}|${c.uid}`);
+
+  const init: RequestInit = { method: req.method, headers };
+  if (req.method === 'POST') init.body = data;
+
+  let rr: Response;
+  fetch(url, init)
+    .then(rr0 => { rr = rr0; return rr.arrayBuffer(); })
+    .then(buf => {
+      const fwdHeaders = Object.fromEntries(
+        [...rr.headers].filter(([k]) =>
+          k !== 'content-encoding' && k !== 'content-length' && k !== 'transfer-encoding'
+        )
+      );
+      res.writeHead(rr.status, fwdHeaders);
+      res.end(Buffer.from(buf));
+    })
+    .catch((e: Error) => httpErr(res, 502, 'Bad Gateway: ' + e.message));
+}
+
 function dispatch(req: http.IncomingMessage, res: http.ServerResponse, data?: string): void {
   const url = req.url ?? '/';
   console.log(req.method + ' ' + url + ' ' + JSON.stringify(data ?? ''));
@@ -199,6 +246,10 @@ function dispatch(req: http.IncomingMessage, res: http.ServerResponse, data?: st
   else if (url.startsWith('/api/'))             relay_api(req, res, SESS.client!, data);
   else if (url.startsWith('/remote/'))          relay_gui(req, res, SESS.client!, data);
   else if (url.startsWith('/cgi-bin/remote/'))  relay_cgi(req, res, SESS.client!, data);
+  // Version-prefixed paths (e.g. /beta-22.26/gw?... or /beta-22.26/js/foo.js) —
+  // must be proxied (not redirected) so XHR requests like /gw don't hit CORS.
+  else if (SESS.client && /^\/[a-z][a-z0-9]*-[\w.]+\//.test(url))
+    relay_versioned(req, res, SESS.client, data);
   else {
     let localUrl = url;
     for (const [pattern, replacement] of mountedPaths) {
