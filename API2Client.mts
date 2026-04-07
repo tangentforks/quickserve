@@ -50,7 +50,7 @@ export class API2Client {
   cookie(): string { return this.isLoggedIn() ? `session=${this.uid}|${this.sid}|${this.epw}` : ''; }
 
   /// Build the request URL for an API endpoint.
-  /// Empty box  → relative  /api/... URL (browser; server handles auth via cookie).
+  /// Empty box  → relative /api/... URL (browser proxy mode; quickserve handles routing).
   /// Non-empty box → absolute https://box/ver/api/... URL (Node; cookie set explicitly).
   _url(ep: string, fmt_?: string): string {
     fmt_ = fmt_ || ':json';
@@ -62,7 +62,6 @@ export class API2Client {
     ep = ee.join('?');
     const path = `/api/${ep}`;
     if (this.box) return `https://${this.box}/${this.ver}${path}`;
-    if (this.ver) return `/${this.ver}${path}`;
     return path;
   }
 
