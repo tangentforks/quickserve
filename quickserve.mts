@@ -164,7 +164,14 @@ function relay_nonapi(url: string, req: http.IncomingMessage, res: http.ServerRe
   fetch(url, init)
     .then(rr0 => { rr = rr0; return rr.text(); })
     .then(text => {
-      res.writeHead(rr.status, Object.fromEntries(rr.headers));
+      // rr.text() already decodes the body, so strip encoding/length headers
+      // that no longer match the decoded, rewritten content.
+      const fwdHeaders = Object.fromEntries(
+        [...rr.headers].filter(([k]) =>
+          k !== 'content-encoding' && k !== 'content-length' && k !== 'transfer-encoding'
+        )
+      );
+      res.writeHead(rr.status, fwdHeaders);
       res.write(text.replaceAll(c.ver, 'remote'));
       res.end();
     })
