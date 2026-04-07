@@ -88,10 +88,6 @@ export class API2Client {
     }).then(res => {
       if (!res.ok) {
         return res.text().then(text => {
-          console.log('-- error from server ------------------------------------');
-          console.log(res.status, res.headers.get('content-type'));
-          console.log(text);
-          console.log('---------------------------------------------------------');
           throw new API2Error(res.status, res.headers.get('content-type'), text);
         });
       }
